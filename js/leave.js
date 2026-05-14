@@ -81,6 +81,10 @@ function getLeaveTabBar() {
 
 function switchLeaveTab(tab) {
   leaveActiveTab = tab;
+  if (leaveRecords.length === 0) {
+    const cached = Cache.getLeave();
+    if (cached) leaveRecords = cached;
+  }
   renderLeaveSection();
 }
 
