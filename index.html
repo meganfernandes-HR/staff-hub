@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Staff Hub" />
+  <meta name="theme-color" content="#0a0a0a" />
+  <title>Staff Hub</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,300&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+
+  <!-- PIN SCREEN -->
+  <div id="pin-screen" class="pin-screen">
+    <div class="pin-inner">
+      <div class="pin-logo">
+        <div class="pin-logo-mark">S</div>
+        <div class="pin-logo-text">Staff Hub</div>
+        <div class="pin-logo-sub">Subko Coffee</div>
+      </div>
+      <div class="pin-prompt">Enter PIN to continue</div>
+      <div class="pin-dots">
+        <span class="dot" id="d0"></span>
+        <span class="dot" id="d1"></span>
+        <span class="dot" id="d2"></span>
+        <span class="dot" id="d3"></span>
+      </div>
+      <div class="pin-error" id="pin-error">Incorrect PIN</div>
+      <div class="pin-pad">
+        <button class="pin-key" data-val="1">1</button>
+        <button class="pin-key" data-val="2">2</button>
+        <button class="pin-key" data-val="3">3</button>
+        <button class="pin-key" data-val="4">4</button>
+        <button class="pin-key" data-val="5">5</button>
+        <button class="pin-key" data-val="6">6</button>
+        <button class="pin-key" data-val="7">7</button>
+        <button class="pin-key" data-val="8">8</button>
+        <button class="pin-key" data-val="9">9</button>
+        <button class="pin-key pin-key--blank"></button>
+        <button class="pin-key" data-val="0">0</button>
+        <button class="pin-key pin-key--del" id="pin-del">⌫</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAIN APP -->
+  <div id="app" class="app hidden">
+
+    <!-- TOP BAR -->
+    <header class="topbar">
+      <button class="topbar-back hidden" id="back-btn" onclick="goBack()">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M5 12l7 7M5 12l7-7"/></svg>
+      </button>
+      <div class="topbar-title" id="topbar-title">Staff Hub</div>
+      <button class="topbar-action" id="topbar-action-btn" onclick="showAddEmployee()" title="Add employee">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+      </button>
+    </header>
+
+    <!-- PAGES -->
+
+    <!-- DIRECTORY PAGE -->
+    <div id="page-directory" class="page active">
+      <div class="search-bar">
+        <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        <input type="text" id="search-input" placeholder="Search by name or position…" oninput="filterEmployees()" />
+        <button class="search-clear hidden" id="search-clear" onclick="clearSearch()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <div class="stats-strip">
+        <div class="stat-pill">
+          <span class="stat-num" id="stat-total">0</span>
+          <span class="stat-label">Total staff</span>
+        </div>
+        <div class="stat-pill">
+          <span class="stat-num" id="stat-probation">0</span>
+          <span class="stat-label">On probation</span>
+        </div>
+        <div class="stat-pill">
+          <span class="stat-num" id="stat-new">0</span>
+          <span class="stat-label">Joined this month</span>
+        </div>
+      </div>
+
+      <div class="section-label" id="dir-section-label">All staff</div>
+      <div class="employee-list" id="employee-list"></div>
+      <div class="empty-state hidden" id="empty-state">
+        <div class="empty-icon">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        </div>
+        <div>No results for that search</div>
+      </div>
+    </div>
+
+    <!-- PROFILE PAGE -->
+    <div id="page-profile" class="page hidden">
+      <div id="profile-content"></div>
+    </div>
+
+    <!-- ADD / EDIT PAGE -->
+    <div id="page-form" class="page hidden">
+      <div class="form-container" id="form-container"></div>
+    </div>
+
+  </div>
+
+  <script src="js/data.js"></script>
+  <script src="js/app.js"></script>
+<script>if("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js");</script>
+</body>
+</html>
