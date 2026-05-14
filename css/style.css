@@ -527,3 +527,19 @@ html, body {
 .av-7 { background: rgba(180,140,80,0.18);  color: #c8a850; }
 
 ::-webkit-scrollbar { width: 0; }
+
+/* ── LEAVE TAB BAR ── */
+.leave-tab-bar {
+  display: flex; border-bottom: 0.5px solid var(--border);
+  background: var(--bg); padding: 0 14px;
+}
+.leave-tab {
+  flex: 1; height: 40px;
+  display: flex; align-items: center; justify-content: center;
+  gap: 6px; border: none; background: none;
+  color: var(--text3); font-family: var(--font); font-size: 13px;
+  cursor: pointer; border-bottom: 2px solid transparent;
+  margin-bottom: -0.5px; transition: color 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.leave-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
