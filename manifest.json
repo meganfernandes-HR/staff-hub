@@ -1,22 +1,14 @@
 {
-  "name": "Staff Hub — Subko Coffee",
-  "short_name": "Staff Hub",
-  "description": "Employee directory for Subko Coffee",
-  "start_url": "/",
+  "name": "Subko Staff Hub",
+  "short_name": "Subko Hub",
+  "description": "Staff directory and leave tracker for Subko Coffee",
+  "start_url": "/staff-hub/",
   "display": "standalone",
-  "background_color": "#0a0a0a",
-  "theme_color": "#0a0a0a",
+  "background_color": "#1c2b1e",
+  "theme_color": "#1c2b1e",
   "orientation": "portrait",
   "icons": [
-    {
-      "src": "icons/icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png"
-    },
-    {
-      "src": "icons/icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png"
-    }
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" }
   ]
 }
