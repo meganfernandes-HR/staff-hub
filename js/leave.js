@@ -2,15 +2,44 @@
 //  LEAVE STATE
 // ─────────────────────────────────────────
 
-let leaveRecords   = [];
-let calMonth       = new Date().getMonth();
-let calYear        = new Date().getFullYear();
-let selectedCalDay = null;
-let currentFilter  = 'all';
-let selectedLeaveId = null;
+let leaveRecords    = [];
+let calMonth        = new Date().getMonth();
+let calYear         = new Date().getFullYear();
+let selectedCalDay  = null;
+let currentFilter   = 'all';
+let leaveActiveTab  = 'list';
 
 // ─────────────────────────────────────────
-//  LEAVE OVERVIEW
+//  DATE HELPERS — English only, no timezone
+// ─────────────────────────────────────────
+
+function parseDate(str) {
+  if (!str) return new Date(0);
+  const s = (typeof str === 'string' ? str : str.toISOString()).split('T')[0].split(' ')[0];
+  const [y, m, d] = s.split('-').map(Number);
+  const dt = new Date(y, m - 1, d);
+  dt.setHours(0,0,0,0);
+  return dt;
+}
+
+function fmtLeaveDate(str) {
+  if (!str) return '—';
+  const s = (typeof str === 'string' ? str : str.toISOString()).split('T')[0].split(' ')[0];
+  const [y, m, d] = s.split('-').map(Number);
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${d} ${months[m-1]} ${y}`;
+}
+
+function fmtDateRange(from, to) {
+  if (!from) return '—';
+  const f = fmtLeaveDate(from);
+  const t = fmtLeaveDate(to);
+  if (!to || from === to) return f;
+  return `${f} – ${t}`;
+}
+
+// ─────────────────────────────────────────
+//  ENTRY POINT
 // ─────────────────────────────────────────
 
 async function showLeaveOverview() {
@@ -18,60 +47,94 @@ async function showLeaveOverview() {
   showPage('leave', 'Leave', false, false, true);
 
   const cached = Cache.getLeave();
-  if (cached) { leaveRecords = cached; renderLeaveList(); }
+  if (cached) { leaveRecords = cached; renderLeaveSection(); }
 
   const res = await Sheets.getLeaveRecords();
   if (res.ok && res.data) {
     leaveRecords = res.data;
     Cache.setLeave(leaveRecords);
-    renderLeaveList();
+    renderLeaveSection();
   }
 }
 
+function renderLeaveSection() {
+  if (leaveActiveTab === 'list') renderLeaveList();
+  else renderCalendar();
+}
+
+// ─────────────────────────────────────────
+//  TAB BAR
+// ─────────────────────────────────────────
+
+function getLeaveTabBar() {
+  return `<div class="leave-tab-bar">
+    <button class="leave-tab ${leaveActiveTab==='list'?'active':''}" onclick="switchLeaveTab('list')">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+      List
+    </button>
+    <button class="leave-tab ${leaveActiveTab==='calendar'?'active':''}" onclick="switchLeaveTab('calendar')">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      Calendar
+    </button>
+  </div>`;
+}
+
+function switchLeaveTab(tab) {
+  leaveActiveTab = tab;
+  renderLeaveSection();
+}
+
+// ─────────────────────────────────────────
+//  LIST VIEW
+// ─────────────────────────────────────────
+
 function filterLeave(f) {
   currentFilter = f;
-  document.querySelectorAll('.f-pill').forEach(p => {
-    p.classList.toggle('active', p.dataset.filter === f);
-  });
   renderLeaveList();
 }
 
 function renderLeaveList() {
   const container = document.getElementById('leave-list-container');
-  const today = new Date(); today.setHours(0,0,0,0);
-  const weekEnd = new Date(today); weekEnd.setDate(today.getDate() + 7);
-  const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+  const today     = new Date(); today.setHours(0,0,0,0);
+  const weekEnd   = new Date(today); weekEnd.setDate(today.getDate() + 7);
+  const monthEnd  = new Date(today.getFullYear(), today.getMonth() + 1, 0);
 
   function inRange(rec) {
-    const from = new Date(rec.fromDate + 'T00:00:00');
-    const to   = new Date(rec.toDate   + 'T00:00:00');
+    const from = parseDate(rec.fromDate);
+    const to   = parseDate(rec.toDate);
     if (currentFilter === 'today') return from <= today && to >= today;
     if (currentFilter === 'week')  return from <= weekEnd && to >= today;
     if (currentFilter === 'month') return from <= monthEnd && to >= today;
     return true;
   }
 
-  const filtered = leaveRecords.filter(inRange).sort((a, b) => new Date(a.fromDate) - new Date(b.fromDate));
+  const filtered = leaveRecords.filter(inRange)
+    .sort((a,b) => parseDate(a.fromDate) - parseDate(b.fromDate));
 
-  if (filtered.length === 0) {
-    container.innerHTML = `<div class="leave-empty">No leave records for this period</div>`;
-    return;
-  }
-
-  // Group into sections
   const onNow = [], upcoming = [], later = [];
   filtered.forEach(rec => {
-    const from = new Date(rec.fromDate + 'T00:00:00');
-    const to   = new Date(rec.toDate   + 'T00:00:00');
-    if (from <= today && to >= today) onNow.push(rec);
+    const from = parseDate(rec.fromDate);
+    const to   = parseDate(rec.toDate);
+    if (from <= today && to >= today)         onNow.push(rec);
     else if (from > today && from <= weekEnd) upcoming.push(rec);
-    else later.push(rec);
+    else                                       later.push(rec);
   });
 
-  let html = '';
+  let html = getLeaveTabBar();
+  html += `<div class="filter-row">
+    <button class="f-pill ${currentFilter==='all'?'active':''}" data-filter="all" onclick="filterLeave('all')">All</button>
+    <button class="f-pill ${currentFilter==='today'?'active':''}" data-filter="today" onclick="filterLeave('today')">Today</button>
+    <button class="f-pill ${currentFilter==='week'?'active':''}" data-filter="week" onclick="filterLeave('week')">This week</button>
+    <button class="f-pill ${currentFilter==='month'?'active':''}" data-filter="month" onclick="filterLeave('month')">This month</button>
+  </div>`;
+
+  if (filtered.length === 0) {
+    html += `<div class="leave-empty">No leave records for this period</div>`;
+    container.innerHTML = html; return;
+  }
 
   if (onNow.length) {
-    html += `<div class="leave-section"><div class="leave-section-title">On leave now — ${onNow.length} ${onNow.length === 1 ? 'person' : 'people'}</div>`;
+    html += `<div class="leave-section"><div class="leave-section-title">On leave now — ${onNow.length} ${onNow.length===1?'person':'people'}</div>`;
     onNow.forEach(r => { html += leaveCardHtml(r); });
     html += '</div>';
   }
@@ -93,21 +156,16 @@ function leaveCardHtml(rec) {
   const initials   = getInitials(rec.employeeName || '?');
   const colorClass = 'av-' + (Math.abs(hashStr(rec.employeeName || '')) % 8);
   const badgeClass = leaveTypeBadge(rec.leaveType);
-  const dateStr    = rec.fromDate === rec.toDate
-    ? formatDate(rec.fromDate)
-    : `${formatDate(rec.fromDate)} – ${formatDate(rec.toDate)}`;
+  const dateStr    = fmtDateRange(rec.fromDate, rec.toDate);
 
-  return `<div class="leave-section">
-    <div class="leave-card" onclick="showLeaveDetail('${escHtml(rec.recordId)}')">
-      <div class="emp-avatar ${colorClass}" style="width:36px;height:36px;border-radius:10px;font-size:12px">${initials}</div>
-      <div class="leave-info">
-        <div class="leave-name">${escHtml(rec.employeeName || '—')}</div>
-        <div class="leave-dates">${dateStr}</div>
-      </div>
-      <div class="leave-right">
-        <span class="badge ${badgeClass}">${escHtml(rec.leaveType)}</span>
-        <span class="leave-days">${rec.workingDays || '—'} days</span>
-      </div>
+  return `<div class="leave-card" onclick="showLeaveDetail('${escHtml(rec.recordId)}')">
+    <div class="emp-avatar ${colorClass}" style="width:36px;height:36px;border-radius:10px;font-size:12px;flex-shrink:0">${initials}</div>
+    <div class="leave-info">
+      <div class="leave-name">${escHtml(rec.employeeName || '—')}</div>
+      <div class="leave-dates">${dateStr}</div>
+    </div>
+    <div class="leave-right">
+      <span class="badge ${badgeClass}">${escHtml(rec.leaveType)}</span>
     </div>
   </div>`;
 }
@@ -119,24 +177,18 @@ function leaveCardHtml(rec) {
 function showLeaveDetail(recordId) {
   const rec = leaveRecords.find(r => r.recordId === recordId);
   if (!rec) return;
-  selectedLeaveId = recordId;
   pageHistory.push(() => showLeaveOverview());
-
-  const dateStr = rec.fromDate === rec.toDate
-    ? formatDate(rec.fromDate)
-    : `${formatDate(rec.fromDate)} – ${formatDate(rec.toDate)}`;
 
   const initials   = getInitials(rec.employeeName || '?');
   const colorClass = 'av-' + (Math.abs(hashStr(rec.employeeName || '')) % 8);
   const badgeClass = leaveTypeBadge(rec.leaveType);
 
-  // Reuse profile page for leave detail
   document.getElementById('profile-content').innerHTML = `
     <div class="profile-hero">
       <div class="profile-avatar ${colorClass}">${initials}</div>
       <div>
         <div class="profile-name">${escHtml(rec.employeeName || '—')}</div>
-        <div class="profile-role">${dateStr}</div>
+        <div class="profile-role">${fmtDateRange(rec.fromDate, rec.toDate)}</div>
         <div class="profile-badges"><span class="badge ${badgeClass}">${escHtml(rec.leaveType)}</span></div>
       </div>
     </div>
@@ -144,24 +196,22 @@ function showLeaveDetail(recordId) {
       <div class="profile-card">
         <div class="profile-card-title">Leave details</div>
         ${fRow('Leave type', rec.leaveType, true)}
-        ${fRow('From', formatDate(rec.fromDate), true)}
-        ${fRow('To', formatDate(rec.toDate), true)}
-        ${fRow('Working days', rec.workingDays ? rec.workingDays + ' days' : '—', true)}
+        ${fRow('From', fmtLeaveDate(rec.fromDate), true)}
+        ${fRow('To', fmtLeaveDate(rec.toDate), true)}
         ${rec.notes ? fRow('Notes', rec.notes, true) : ''}
       </div>
       <div class="profile-card">
         <div class="profile-card-title">Record info</div>
         ${fRow('Record ID', rec.recordId)}
         ${fRow('Logged by', rec.loggedBy || '—', true)}
-        ${fRow('Logged on', formatDate(rec.loggedOn), true)}
+        ${fRow('Logged on', fmtLeaveDate(rec.loggedOn), true)}
       </div>
     </div>
-    <div style="padding: 0 14px 30px;">
+    <div style="padding:0 14px 30px;">
       <button class="delete-leave-btn" onclick="confirmDeleteLeave('${escHtml(recordId)}')">
         Delete this leave record
       </button>
-    </div>
-  `;
+    </div>`;
 
   document.getElementById('page-profile').scrollTop = 0;
   showPage('profile', rec.employeeName ? rec.employeeName.split(' ')[0] : 'Leave', true, false, false);
@@ -185,83 +235,74 @@ function confirmDeleteLeave(recordId) {
 }
 
 // ─────────────────────────────────────────
-//  CALENDAR
+//  CALENDAR VIEW
 // ─────────────────────────────────────────
 
-function showCalendar() {
-  pageHistory.push(() => showLeaveOverview());
-  renderCalendar();
-  showPage('calendar', 'Calendar', true, false, true);
-}
-
 function renderCalendar() {
-  const container = document.getElementById('calendar-container');
-  const today = new Date(); today.setHours(0,0,0,0);
-  const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const container = document.getElementById('leave-list-container');
+  const today  = new Date(); today.setHours(0,0,0,0);
+  const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const DAYS   = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
 
-  // Build days-in-month grid
   const firstDay = new Date(calYear, calMonth, 1);
   const lastDay  = new Date(calYear, calMonth + 1, 0);
+  let startDow   = firstDay.getDay();
+  startDow       = startDow === 0 ? 6 : startDow - 1;
 
-  // Adjust for Mon start (UAE)
-  let startDow = firstDay.getDay(); // 0=Sun
-  startDow = startDow === 0 ? 6 : startDow - 1; // Mon=0
-
-  // Map leave records to days
   const leaveDays = {};
   leaveRecords.forEach(rec => {
-    let cur = new Date(rec.fromDate + 'T00:00:00');
-    const end = new Date(rec.toDate + 'T00:00:00');
+    let cur = parseDate(rec.fromDate);
+    const end = parseDate(rec.toDate);
     while (cur <= end) {
       if (cur.getMonth() === calMonth && cur.getFullYear() === calYear) {
-        const key = cur.getDate();
-        leaveDays[key] = (leaveDays[key] || 0) + 1;
+        const k = cur.getDate();
+        if (!leaveDays[k]) leaveDays[k] = [];
+        leaveDays[k].push(rec);
       }
-      cur.setDate(cur.getDate() + 1);
+      cur = new Date(cur.getTime()); cur.setDate(cur.getDate() + 1);
     }
   });
 
   let cells = '';
-  // Empty cells
-  for (let i = 0; i < startDow; i++) cells += `<div class="cal-d other-month"></div>`;
-  // Day cells
+  for (let i = 0; i < startDow; i++) cells += `<div class="cal-d"></div>`;
   for (let d = 1; d <= lastDay.getDate(); d++) {
     const isToday = d === today.getDate() && calMonth === today.getMonth() && calYear === today.getFullYear();
-    const count = leaveDays[d] || 0;
+    const count   = (leaveDays[d] || []).length;
     let cls = 'cal-d';
-    if (isToday) cls += ' today';
-    if (count === 1) cls += ' has-leave';
-    if (count >= 2) cls += ' multi-leave';
+    if (isToday)       cls += ' today';
+    if (count === 1)   cls += ' has-leave';
+    if (count >= 2)    cls += ' multi-leave';
     if (selectedCalDay === d) cls += ' selected';
     const dot = count > 0 ? '<div class="cal-dot"></div>' : '';
     cells += `<div class="${cls}" onclick="selectCalDay(${d})">${d}${dot}</div>`;
   }
 
-  // Detail for selected day
   let detail = '';
-  if (selectedCalDay) {
-    const sel = new Date(calYear, calMonth, selectedCalDay);
-    const dayRecs = leaveRecords.filter(rec => {
-      const from = new Date(rec.fromDate + 'T00:00:00');
-      const to   = new Date(rec.toDate   + 'T00:00:00');
+  if (selectedCalDay !== null) {
+    const sel  = new Date(calYear, calMonth, selectedCalDay); sel.setHours(0,0,0,0);
+    const recs = leaveRecords.filter(rec => {
+      const from = parseDate(rec.fromDate);
+      const to   = parseDate(rec.toDate);
       return from <= sel && to >= sel;
     });
-    detail = `<div class="cal-day-detail">
-      <div class="cal-day-detail-title">${selectedCalDay} ${monthNames[calMonth]} — ${dayRecs.length ? dayRecs.length + ' on leave' : 'No leave'}</div>
-      ${dayRecs.map(r => leaveCardHtml(r)).join('')}
+    detail = `<div style="padding:0 14px;">
+      <div class="leave-section-title" style="margin-bottom:8px">
+        ${selectedCalDay} ${MONTHS[calMonth]} — ${recs.length ? recs.length + ' on leave' : 'No leave logged'}
+      </div>
+      ${recs.length ? recs.map(r => leaveCardHtml(r)).join('') : `<div style="color:var(--text3);font-size:13px;padding:16px 0">No leave on this day</div>`}
     </div>`;
   }
 
   container.innerHTML = `
-    <div class="cal-wrap">
+    ${getLeaveTabBar()}
+    <div style="padding:12px 14px 0">
       <div class="cal-head">
         <button class="cal-nav" onclick="calNav(-1)">‹</button>
-        <div class="cal-month">${monthNames[calMonth]} ${calYear}</div>
+        <div class="cal-month">${MONTHS[calMonth]} ${calYear}</div>
         <button class="cal-nav" onclick="calNav(1)">›</button>
       </div>
       <div class="cal-grid">
-        <div class="cal-dh">Mon</div><div class="cal-dh">Tue</div><div class="cal-dh">Wed</div>
-        <div class="cal-dh">Thu</div><div class="cal-dh">Fri</div><div class="cal-dh">Sat</div><div class="cal-dh">Sun</div>
+        ${DAYS.map(d=>`<div class="cal-dh">${d}</div>`).join('')}
         ${cells}
       </div>
       <div class="cal-legend">
@@ -269,8 +310,8 @@ function renderCalendar() {
         <div class="leg-item"><div class="leg-dot" style="background:var(--green-dim);border:0.5px solid rgba(74,124,82,0.3)"></div>2+ people</div>
       </div>
     </div>
-    ${detail}
-  `;
+    <div style="height:14px"></div>
+    ${detail}`;
 }
 
 function calNav(dir) {
@@ -297,11 +338,8 @@ function showAddLeave() {
   showPage('leave-form', 'Log leave', true, false, false);
 }
 
-let selectedEmpForLeave = null;
-
 function renderLeaveForm() {
   const today = new Date().toISOString().split('T')[0];
-  selectedEmpForLeave = null;
 
   document.getElementById('leave-form-container').innerHTML = `
     <div class="form-group">
@@ -317,32 +355,24 @@ function renderLeaveForm() {
     <div class="form-group">
       <label class="form-label">Leave type *</label>
       <select class="form-select" id="lf-type">
-        ${LEAVE_TYPES.map(t => `<option value="${t.value}">${t.value}</option>`).join('')}
+        ${LEAVE_TYPES.map(t=>`<option value="${t.value}">${t.value}</option>`).join('')}
       </select>
     </div>
     <div class="form-row-2">
       <div class="form-group">
         <label class="form-label">From *</label>
-        <input class="form-input" id="lf-from" type="date" value="${today}" oninput="updateDuration()" />
+        <input class="form-input" id="lf-from" type="date" value="${today}" />
       </div>
       <div class="form-group">
         <label class="form-label">To *</label>
-        <input class="form-input" id="lf-to" type="date" value="${today}" oninput="updateDuration()" />
+        <input class="form-input" id="lf-to" type="date" value="${today}" />
       </div>
-    </div>
-    <div class="duration-card" id="lf-duration">
-      <div class="duration-label">Duration</div>
-      <div class="duration-val">1 working day</div>
-      <div class="duration-sub">Sun–Thu working week</div>
     </div>
     <div class="form-group">
       <label class="form-label">Notes <span style="font-size:10px;color:var(--text3);text-transform:none;letter-spacing:0">(optional)</span></label>
       <input class="form-input" id="lf-notes" placeholder="e.g. cover arranged with James" />
     </div>
-    <button class="form-save-btn" id="lf-save-btn" onclick="saveLeave()">Save leave record</button>
-  `;
-
-  updateDuration();
+    <button class="form-save-btn" id="lf-save-btn" onclick="saveLeave()">Save leave record</button>`;
 }
 
 function openEmpSearch() {
@@ -351,53 +381,30 @@ function openEmpSearch() {
 }
 
 function filterEmpSearch() {
-  const q = document.getElementById('lf-emp-search').value.toLowerCase();
+  const q       = document.getElementById('lf-emp-search').value.toLowerCase();
   const results = document.getElementById('emp-search-results');
   const filtered = employees.filter(e => e.name.toLowerCase().includes(q)).slice(0, 8);
-
-  if (filtered.length === 0) {
-    results.innerHTML = `<div class="emp-result-item" style="color:var(--text3)">No results</div>`;
-  } else {
-    results.innerHTML = filtered.map(e => `
-      <div class="emp-result-item" onclick="selectEmp('${escHtml(e.id)}','${escHtml(e.name)}')">
+  results.innerHTML = filtered.length
+    ? filtered.map(e=>`<div class="emp-result-item" onclick="selectEmp('${escHtml(e.id)}','${escHtml(e.name)}')">
         <div>${escHtml(e.name)}</div>
-        <div class="emp-result-sub">${escHtml(e.position || e.id)}</div>
-      </div>`).join('');
-  }
+        <div class="emp-result-sub">${escHtml(e.position||e.id)}</div>
+      </div>`).join('')
+    : `<div class="emp-result-item" style="color:var(--text3)">No results</div>`;
   results.classList.add('open');
 }
 
 function selectEmp(id, name) {
-  selectedEmpForLeave = { id, name };
   document.getElementById('lf-emp-search').value = name;
   document.getElementById('lf-emp-id').value     = id;
   document.getElementById('lf-emp-name').value   = name;
   document.getElementById('emp-search-results').classList.remove('open');
 }
 
-// Close dropdown on outside tap
 document.addEventListener('click', e => {
   const wrap = document.getElementById('emp-search-results');
-  if (wrap && !wrap.contains(e.target) && e.target.id !== 'lf-emp-search') {
+  if (wrap && !wrap.contains(e.target) && e.target.id !== 'lf-emp-search')
     wrap.classList.remove('open');
-  }
 });
-
-function updateDuration() {
-  const from = document.getElementById('lf-from')?.value;
-  const to   = document.getElementById('lf-to')?.value;
-  const card = document.getElementById('lf-duration');
-  if (!from || !to || !card) return;
-
-  const f = new Date(from + 'T00:00:00');
-  const t = new Date(to   + 'T00:00:00');
-  if (t < f) { card.querySelector('.duration-val').textContent = 'Invalid range'; return; }
-
-  const days = workingDays(f, t);
-  card.querySelector('.duration-val').textContent = `${days} working day${days !== 1 ? 's' : ''}`;
-  card.querySelector('.duration-sub').textContent =
-    `${f.toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'})} – ${t.toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'})}`;
-}
 
 async function saveLeave() {
   const empName = document.getElementById('lf-emp-name').value.trim();
@@ -408,12 +415,11 @@ async function saveLeave() {
 
   if (!empName) { alert('Please select an employee.'); return; }
   if (!from || !to) { alert('Please select dates.'); return; }
-  if (new Date(to + 'T00:00:00') < new Date(from + 'T00:00:00')) { alert('End date must be after start date.'); return; }
+  if (new Date(to+'T00:00:00') < new Date(from+'T00:00:00')) { alert('End date must be after start date.'); return; }
 
   const btn = document.getElementById('lf-save-btn');
   btn.textContent = 'Saving…'; btn.disabled = true;
 
-  const days = workingDays(new Date(from + 'T00:00:00'), new Date(to + 'T00:00:00'));
   const record = {
     recordId:     'LV-' + Date.now(),
     employeeName: empName,
@@ -421,7 +427,7 @@ async function saveLeave() {
     leaveType:    type,
     fromDate:     from,
     toDate:       to,
-    workingDays:  days,
+    workingDays:  '',
     notes:        document.getElementById('lf-notes').value.trim(),
     loggedBy:     'Manager',
     loggedOn:     new Date().toISOString().split('T')[0]
